@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs
+# About: SquashFS plugin for Midnight Commander
+
+INC=$(dirname "$(readlink -f "$0")")
+
+bye() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+command -v unsquashfs >/dev/null ||
+    bye 'unsquashfs is not installed (squashfs-tools package)'
+
+cmd=$1
+shift
+
+case "$cmd" in
+    list)
+        lls_out=$(mktemp "${MC_TMPDIR:-/tmp}"/mc-usqfs.XXXXXX) || exit
+        # shellcheck disable=SC2064
+        trap "rm -f '${lls_out}'" EXIT
+
+        unsquashfs -d '' -lls "$1" > "$lls_out" || exit
+        awk -f "$INC"/list.awk < "$lls_out"
+        ;;
+    copyout)
+        unsquashfs -cat "$1" "$2" > "$3"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
