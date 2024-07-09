@@ -1,0 +1,72 @@
+#!/bin/sh
+# shellcheck disable=SC3043
+
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs
+# About: Readonly xorriso based ISO9660 plugin for Midnight Commander
+
+INC=$(dirname "$(readlink -f "$0")")
+
+bye() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+run_xorriso() {
+    local iso="$1"
+    shift
+
+    xorriso -report_about WARNING -dev stdio:"$iso" "$@"
+    local _st=$?
+
+    # Append "x" to protect any trailing empty lines from trimming by
+    # log=$(run_xorriso ..). The empty line of interest is the one produced by
+    # xorriso_main.c:yell_xorriso() when the header is the only content in
+    # stderr. The sed command in process_log() cant remove the header if the
+    # empty line is not there
+    echo x >&2
+    return "$_st"
+}
+
+# $1 is run_xorriso's status
+process_log() {
+    # Remove the header produced by xorriso_main.c:yell_xorriso()
+    log=$(printf '%s' "$log" | sed -E '1{/xorriso .+ filesystem manipulator/{N;d;};}')
+
+    # If there is anything left, pass it to mc (with the "x" protector removed)
+    [ "$log" = x ] || printf -- '%s' "$log" | sed '$d' | fold -s -w70 >&2
+
+    [ "$1" = 0 ] || exit "$1"
+}
+
+command -v xorriso >/dev/null ||
+    bye 'xorriso is not installed'
+
+cmd=$1
+shift
+
+case "$cmd" in
+    list)
+        lsdl_out=$(mktemp "${MC_TMPDIR:-/tmp}"/mc-iso9660xl.XXXXXX) || exit
+        # shellcheck disable=SC2064
+        trap "rm -f '${lsdl_out}'" EXIT
+
+        log=$(run_xorriso "$1" -find / -exec lsdl 2>&1 >"$lsdl_out")
+        process_log "$?"
+
+        # The first line is /, skip it
+        tail -n+2 "$lsdl_out" |
+            # disk_ops.c:Xorriso_format_ls_l() prints the boot catalog file as
+            # of type "e". Make it a generic file
+            sed -E 's,^e,-,' |
+            # Revert misc_funct.c:Text_shellsafe()
+            awk -f "$INC"/unesc.awk
+        ;;
+    copyout)
+        log=$(run_xorriso "$1" -osirrox on -extract "$2" "$3" 2>&1 >/dev/null)
+        process_log "$?"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
