@@ -1,7 +1,7 @@
 #!/bin/sh
 
 # MIT license (c) 2024 https://github.com/slowpeek
-# Homepage: https://github.com/slowpeek/mc-extfs
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
 # About: SquashFS plugin for Midnight Commander
 
 INC=$(dirname "$(readlink -f "$0")")

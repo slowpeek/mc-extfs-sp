@@ -2,7 +2,7 @@
 # shellcheck disable=SC3043
 
 # MIT license (c) 2024 https://github.com/slowpeek
-# Homepage: https://github.com/slowpeek/mc-extfs
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
 # About: Readonly xorriso based ISO9660 plugin for Midnight Commander
 
 INC=$(dirname "$(readlink -f "$0")")
