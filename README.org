@@ -1,0 +1,46 @@
+* About
+
+This is a collection of extfs helpers for Midnight Commander. Some of the
+helpers are alternatives to the stock scripts, others provide new features.
+
+* Installation
+
+Extract the archive or clone the repo somewhere. Change into the dir and run
+=install-symlinks.sh= there to create symlinks, pointing to the scripts, under
+=~/.local/share/mc/extfs.d=
+
+For each helper you want to use, check its particular README for details and
+dependencies and make sure the deps are satisfied.
+
+For each helper you want to use, you need to tell mc it should utilize the
+script to open the relevant file type. In mc menu, open /Command/ -> /Edit
+extension file/. Next:
+
+- iso9660-sp :: Find =ISO9660= section and replace ~Open=%cd %p/iso9660://~ with
+  ~Open=%cd %p/iso9660-sp://~
+- usqfs-sp :: Add such snippet under =### Archives ###=:
+  - up to mc 4.8.28 ::
+
+    #+begin_example
+      # .squashfs, .sqfs
+      regex/\.(squashfs|sqfs)
+          Open=%cd %p/usqfs-sp://
+    #+end_example
+
+  - since mc 4.8.29 ::
+
+    #+begin_example
+      [squashfs]
+      Regex=\.(squashfs|sqfs)$
+      Open=%cd %p/usqfs-sp://
+    #+end_example
+
+Restart mc to apply the changes.
+
+* Uninstallation
+
+In mc menu, open /Command/ -> /Edit extension file/ and undo all the changes
+made earlier. After that, delete =*-sp= symlinks from
+=~/.local/share/mc/extfs.d=
+
+Restart mc to apply the changes.

@@ -1,0 +1,18 @@
+* About
+
+This is a readonly [[https://www.gnu.org/software/xorriso/][GNU xorriso]] based ISO9660 helper for Midnight Commander.
+
+*Pros* compared to the classic ISO9660 plugin (the xorriso part of it):
+- it is readonly, you cant mess your iso image with it
+- it is fast on images containing lots of subdirs
+- symlinks are visible
+- the boot catalog file is visible
+- dirs have actual modified date shown, not the current date
+
+I [[https://github.com/MidnightCommander/mc/pull/196][PR]]-ed the essentials of the code to the mc repository and it got [[https://github.com/MidnightCommander/mc/commit/49e2535c073b9eabf3396f22931441d3e4aa5908][merged]]. It
+should be included in mc 4.8.32.
+
+* Requirements
+
+The code is based on the =xorriso= tool. The package to install is usually
+called the same. Alternative package names: =libisoburn= (NetBSD).
