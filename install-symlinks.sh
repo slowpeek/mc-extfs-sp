@@ -16,7 +16,8 @@ error=error:
 [ -t 1 ] && error=$(printf '\e[31m%s\e[m' "$error")
 
 for path in "$SELF_PATH"/*/*-sp; do
-    [ -f "$path" -a -x "$path" ] || continue
+    # shellcheck disable=SC2015
+    [ -f "$path" ] && [ -x "$path" ] || continue
 
     script=${path##*/}
     if [ -h "$extfs_d/$script" ]; then
