@@ -1,3 +1,6 @@
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
+
 # This script expects raw output of `unsquashfs -d '' -lls ..`. The first line
 # is for the root dir, thats why there is NR>1 condition.
 

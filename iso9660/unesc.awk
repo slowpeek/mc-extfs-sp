@@ -1,3 +1,6 @@
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
+
 # This script reverts xorriso's Text_shellsafe() in output of `xorriso .. -find
 # .. -exec lsdl`. Pseudocode for the function:
 #

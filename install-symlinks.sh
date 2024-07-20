@@ -1,5 +1,8 @@
 #!/bin/sh
 
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
+
 SELF_PATH=$(dirname "$(readlink -f "$0")")
 
 extfs_d=~/.local/share/mc/extfs.d
