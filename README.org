@@ -16,8 +16,16 @@ For each helper you want to use, you need to tell mc it should utilize the
 script to open the relevant file type. In mc menu, open /Command/ -> /Edit
 extension file/. Next:
 
-- iso9660-sp :: Find =ISO9660= section and replace ~Open=%cd %p/iso9660://~ with
-  ~Open=%cd %p/iso9660-sp://~
+- iso9660-sp :: Find =ISO9660= section and
+
+  - replace :: ~Open=%cd %p/iso9660://~
+  - with :: ~Open=%cd %p/iso9660-sp://~
+
+- u7z-sp :: Find =7zip= section and
+
+  - replace :: ~Open=%cd %p/u7z://~
+  - with :: ~Open=%cd %p/u7z-sp://~
+
 - usqfs-sp :: Add such snippet under =### Archives ###=:
   - up to mc 4.8.28 ::
 

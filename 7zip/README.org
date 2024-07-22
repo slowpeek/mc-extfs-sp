@@ -1,0 +1,32 @@
+* About
+
+This is a readonly 7zip helper for Midnight Commander.
+
+*Pros* compared to the classic 7zip plugin:
+- it can see POSIX permissions of items (if present) thanks to the extended
+  listing (~7z l -slt ..~). The classic plugin relies on the basic listing
+  (~7z l ..~), so it can only see the DRHSA attrs
+- if an item only has DRHSA attrs set, it gets listed with the default POSIX
+  permissions limited by the current umask (and =a-w= for files bearing the =R=
+  attr). The classic plugin assumes =drwxr-xr-x= / =-rw-r--r--= for everything
+- it supports symlinks
+- it can detect encrypted headers archives (created as ~7z a -mhe=on -p ..~) and
+  encrypted files inside plain headers archives (created as ~7z a -p ..~). In
+  case you try to open either, an error message is shown. The classic 7zip
+  plugin makes mc unresponsive instead, because the background 7z process waits
+  for a password (ticket [[https://midnight-commander.org/ticket/1685][1685]])
+
+*Limitations*:
+- it is readonly by intention. As of mc 4.8.31, the extfs subsystem incorrectly
+  handles permissions and mtime of files during =copyin= action (ticket
+  [[https://midnight-commander.org/ticket/4558][4558]]). Also, the subsystem does not support adding symlinks to archives
+- newlines in filenames are not supported, like in the classic plugin. It is so
+  because =7z l ..= does not correctly deal with newlines: older versions print
+  it as-is breaking the one-stance-per-line logic, newer versions replace
+  newlines with underscores (using the =Normalize_UString()= function)
+
+* Requirements
+
+The code is based on 7zip tools version 16.02+. The package name to install may
+vary. First, try =7zip= or =7-zip=. These should be available on newer
+systems. If nothing found, try =p7zip-full= or =p7zip=.
