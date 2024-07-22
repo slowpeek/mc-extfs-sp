@@ -1,0 +1,203 @@
+#! /bin/sh
+#
+# MIT license (c) 2024 https://github.com/slowpeek
+# Homepage: https://github.com/slowpeek/mc-extfs-sp
+# About: New generation, readonly 7z plugin for Midnight Commander
+
+INC=$(dirname "$(readlink -f "$0")")
+: "${MC_TMPDIR:=/tmp}"
+
+bye() {
+    printf '%s\n' "$1" >&2
+    exit 1
+}
+
+find_command() {
+    for name; do
+        command -v "$name" 2>/dev/null && return 0
+    done
+
+    return 1
+}
+
+temp_dir=
+cleanup() {
+    if [ -z "${NO_CLEANUP:-}" ]; then
+        case "$temp_dir" in
+            */mc-u7z.*) # Sanity check
+                rm -rf "$temp_dir" ;;
+        esac
+    fi
+}
+
+mk_temp_dir() {
+    temp_dir=$(mktemp -d "$MC_TMPDIR"/mc-u7z.XXXXXX 2>/dev/null) ||
+        bye "Cant create a temp dir under ${MC_TMPDIR}"
+
+    readonly temp_dir
+    trap cleanup EXIT
+}
+
+bye_7z() {
+    # 7z l -t7z /dev/null
+    #   Open ERROR: Can not open the file as [7z] archive
+    #   Open ERROR: Cannot open the file as [7z] archive
+    msg=$(sed -nE '/^Open ERROR: /{s/^.{12}//;p;q;}' "$1")
+    [ -z "$msg" ] || bye "$msg"
+
+    # 7z l no-such-file
+    #   ERROR: No more files
+    #   ERROR: errno=2 : No such file or directory
+    # 7z l /dev/null
+    #   ERROR: /dev/null : Can not open the file as archive
+    #   ERROR: /dev/null : Cannot open the file as archive
+    # 7z l /etc/shadow
+    #   ERROR: /etc/shadow : opening : Permission denied
+    #   ERROR: /etc/shadow : opening : errno=13 : Permission denied
+    # 7z l -p mhe-on.7z
+    #   ERROR: mhe-on.7z : Can not open encrypted archive. Wrong password?
+    #   ERROR: mhe-on.7z : Cannot open encrypted archive. Wrong password?
+    msg=$(sed -nE "/^ERROR: /{s/^.+: //;p;q;}" "$1")
+    if [ -n "$msg" ]; then
+        # Rewrite the wrong password message
+        echo "$msg" | grep -iq password &&
+            msg='Encrypted 7z archives are not supported'
+
+        bye "$msg"
+    fi
+
+    # Pass the error text as-is
+    bye "$(cat "$1")"
+}
+
+do_list() {
+    mk_temp_dir
+
+    date_fmt='%m-%d-%Y %H:%M:%S'
+
+    # When packing with -mtm=off, mtime is not stored. For mtime-less items
+    # we'll use the archive's mtime
+    if ts=$(stat -c %Y "$1" 2>/dev/null); then # GNU stat
+        mtime=$(date -d @"$ts" +"$date_fmt")
+    elif ts=$(stat -f %m "$1" 2>/dev/null); then # BSD stat
+        mtime=$(date -r "$ts" +"$date_fmt")
+    else
+        # Just in case: fallback to the current time
+        mtime=$(date +"$date_fmt")
+    fi
+
+    l_out=$temp_dir/l_out
+    l_err=$temp_dir/l_err
+
+    "$_7ZIP" l ${_7ZIP_P:+-p} -t7z -ba -slt -- "$1" >"$l_out" 2>"$l_err" ||
+        bye_7z "$l_err"
+
+    if [ -n "$_7ZIP_P" ]; then
+        # Above we used an empty password to suppress the prompt for encrypted
+        # archives. Now, try some non-empty password to make sure it is not
+        # encrypted with an empty one
+        "$_7ZIP" l -pabc -t7z -ba -- "$1" / >/dev/null 2>&1 ||
+            bye 'Encrypted 7z archives are not supported'
+    fi
+
+    pass1_out=$temp_dir/pass1_out
+    # Preserve the listing order here, do NOT sort
+    awk -v env_uid="$(id -nu)" -v env_gid="$(id -ng)" -v env_umask="$(umask)" \
+        -v env_mtime="$mtime" -f "$INC"/pass1.awk <"$l_out" >"$pass1_out"
+
+    links=$temp_dir/links
+    grep '^l' "$pass1_out" | cut -d '#' -f2- >"$links"
+
+    result=$temp_dir/result
+
+    if [ -s "$links" ]; then
+        pass2_in=$temp_dir/pass2_in
+        # Dump concatenated targets in the listing order
+        tr '\n' '\000' <"$links" | xargs -0 "$_7ZIP" e -t7z -so -- "$1" >"$pass2_in"
+
+        echo >>"$pass2_in"
+        cat "$pass1_out" >>"$pass2_in"
+
+        pass3_in=$temp_dir/pass3_in
+
+        # Extract targets
+        LC_ALL=C awk -f "$INC"/pass2.awk <"$pass2_in" >"$pass3_in"
+
+        echo >>"$pass3_in"
+        LC_ALL=C sort -t '#' -k 2 <"$pass1_out" >>"$pass3_in"
+
+        # Put targets in place
+        awk -f "$INC"/pass3.awk <"$pass3_in" >"$result"
+    else
+        LC_ALL=C sort -t '#' -k 2 <"$pass1_out" >"$result"
+    fi
+
+    # The point of sorting in extfs adapters is to ensure dirs are listed ahead
+    # of any files underneath.
+    #
+    # For example, such listing
+    #
+    # -rw-r--r-- 1 test test 0 08-25-2022 18:09:31 a/1.txt
+    # drw-r--r-- 1 test test 0 08-25-2022 18:09:31 a
+    # -rw-r--r-- 1 test test 0 08-25-2022 18:09:31 a/2.txt
+    #
+    # would make mc show two "a" dirs.
+    #
+    # Sorting with LC_ALL=C does the task, no matter the actual encoding, and it
+    # does so fast.
+
+    sed -E 's,#, ,' <"$result"
+}
+
+do_copyout () {
+    mk_temp_dir
+
+    out=$temp_dir/out
+    err=$temp_dir/err
+
+    # Check for encrypted files
+    "$_7ZIP" l -t7z -ba -slt -- "$1" "$2" >"$out" 2>"$err" || bye_7z "$err"
+    grep -q '^Method = .*7zAES.*' < "$out" && bye 'The file is encrypted'
+
+    "$_7ZIP" e -t7z -so -- "$1" "$2" > "$3" 2>"$err" || bye_7z "$err"
+}
+
+_7ZIP=$(find_command 7zz 7z 7za 7zr)
+[ -n "$_7ZIP" ] || bye 'Error: none of 7zz, 7z, 7za, 7zr is available'
+
+# Sample headers:
+# 7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
+# 7-Zip (z) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
+year=$("$_7ZIP" | sed -nE '/^7-Zip/{s/.+([12][0-9]{3})-..-..$/\1/;p;q}')
+
+[ -n "$year" ] || bye 'Cant figure out 7zip version'
+# Minimal suitable version is some p7zip 15.xx. Lets stick to 16.02
+[ "$year" -ge 2016 ] || bye 'This tool requires 7zip 16.02+'
+
+# Check if the selected 7zip binary supports encryption. It should NOT rely on
+# the tool name. For example, in openSUSE Leap 15.6 there are 7zip and
+# p7zip-full packages, mutually exclusive. The former is built from 7-zip.org
+# sources (version 23.01). It only provides the standalone 7zz binary. The rest
+# of the tools (7z, 7za, 7zr) are symlinks. Hence, 7zr is a full-fledged tool in
+# this case. p7zip-full is built from p7zip project sources (version 16.02), all
+# the tools are distinct binaries and 7zr is a cut-down one.
+
+_7ZIP_P=
+if $_7ZIP | grep -iq password; then
+    _7ZIP_P=y
+fi
+
+cmd="$1"
+shift
+
+case "$cmd" in
+    list)
+        do_list "$@"
+        ;;
+    copyout)
+        do_copyout "$@"
+        ;;
+    *)
+        exit 1
+        ;;
+esac
