@@ -168,7 +168,7 @@ _7ZIP=$(find_command 7zz 7z 7za 7zr)
 # Sample headers:
 # 7-Zip [64] 16.02 : Copyright (c) 1999-2016 Igor Pavlov : 2016-05-21
 # 7-Zip (z) 21.07 (x64) : Copyright (c) 1999-2021 Igor Pavlov : 2021-12-26
-year=$("$_7ZIP" | sed -nE '/^7-Zip/{s/.+([12][0-9]{3})-..-..$/\1/;p;q}')
+year=$("$_7ZIP" | sed -nE '/^7-Zip/{s/.+([12][0-9]{3})-..-..$/\1/;p;q;}')
 
 [ -n "$year" ] || bye 'Cant figure out 7zip version'
 # Minimal suitable version is some p7zip 15.xx. Lets stick to 16.02
