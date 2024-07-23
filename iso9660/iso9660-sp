@@ -28,13 +28,25 @@ run_xorriso() {
     return "$_st"
 }
 
+# Error messages produced by xorriso could be rather long. process_log() folds
+# long lines at the column calculated here
+fold_width() {
+    size=$(stty size </dev/tty)
+    cols=${size#* }
+
+    fold=$(( cols - 10 ))
+    [ "$fold" -gt 70 ] && fold=70
+
+    echo "$fold"
+}
+
 # $1 is run_xorriso's status
 process_log() {
     # Remove the header produced by xorriso_main.c:yell_xorriso()
     log=$(printf '%s' "$log" | sed -E '1{/xorriso .+ filesystem manipulator/{N;d;};}')
 
     # If there is anything left, pass it to mc (with the "x" protector removed)
-    [ "$log" = x ] || printf -- '%s' "$log" | sed '$d' | fold -s -w70 >&2
+    [ "$log" = x ] || printf -- '%s' "$log" | sed '$d' | fold -s -w"$(fold_width)" >&2
 
     [ "$1" = 0 ] || exit "$1"
 }
