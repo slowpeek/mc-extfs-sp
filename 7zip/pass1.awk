@@ -202,6 +202,11 @@ BEGIN {
         } else { # Unknown format
             skip = 1
         }
+    } else if (field == "Method") {
+        # Skip encrypted symlinks
+        if (substr(perm, 1, 1) == "l" && index($0, "7zAES")) {
+            skip = 1
+        }
     }
 
     FS = "="

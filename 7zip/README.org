@@ -24,6 +24,7 @@ This is a readonly 7zip helper for Midnight Commander.
   because =7z l ..= does not correctly deal with newlines: older versions print
   it as-is breaking the one-stance-per-line logic, newer versions replace
   newlines with underscores (using the =Normalize_UString()= function)
+- encrypted symlinks are not listed (no way to get the target)
 
 * Requirements
 
