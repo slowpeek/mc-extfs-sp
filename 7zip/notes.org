@@ -1,0 +1,116 @@
+* Adding symlinks to 7z
+
+It is not only that mc does not support adding symlinks to extfs, there is a
+problem with 7z itself: p7zip 16.02 (and 17.05 available in archlinux) cant add
+symlinks to archives directly, even with the =-snl= option.
+
+#+begin_example
+  > find * -ls
+         17      4 -rw-r--r--   1 test  test        33 Jul 25 18:34 date.txt
+         18      0 lrwxrwxrwx   1 test  test         8 Jul 25 18:35 link1 -> date.txt
+  > 7z a -snl 1.7z date.txt link1
+  ..
+  > 7z l -ba -slt 1.7z link1
+  Path = link1
+  Size = 8
+  Packed Size =
+  Modified = 2024-07-25 18:34:58
+  Attributes = A_ -rw-r--r--
+  CRC = 7EB8DFC9
+  Encrypted = -
+  Method = LZMA2:12
+  Block = 0
+
+  > 7z e -so 1.7z link1
+  date.txt>
+#+end_example
+
+Evidently, =link1= was added as a regular file with contents =date.txt=. If it
+was added as a part of some dir, there is no such problem, even without =-snl=:
+
+#+begin_example
+  > find * -ls
+         24      0 drwxr-xr-x   2 test  test        80 Jul 25 18:48 dir
+         18      0 lrwxrwxrwx   1 test  test         8 Jul 25 18:35 dir/link1 -> date.txt
+         17      4 -rw-r--r--   1 test  test        33 Jul 25 18:34 dir/date.txt
+  > 7z a 1.7z dir
+  ..
+  > 7z l -ba -slt 1.7z dir/link1
+  Path = dir/link1
+  Size = 8
+  Packed Size =
+  Modified = 2024-07-25 18:35:07
+  Attributes = A_ lrwxrwxrwx
+  CRC = 7EB8DFC9
+  Encrypted = -
+  Method = LZMA2:12
+  Block = 0
+
+  > 7z e -so 1.7z dir/link1
+  date.txt>
+#+end_example
+
+This time the link was added as a link.
+
+In 7zip 21.07, available in ubuntu 22.04, there is no such problem and =-snl=
+there is actually acknowledged.
+
+* Resolving symlinks inside 7z
+
+There are two options: either extract symlinks to stdout or extract it to disk
+and use =readlink= after that.
+
+When using the first option with multiple links, the output is the targets
+concatenated without any separators. Links' sizes from =7z l= should be used to
+split it. Also, caution should be taken on the items order. 7zip maintains some
+/archive order/, likely the adding order. In can be seen on a big archive:
+
+#+begin_example
+  > 7zz a -snl inc.7z /usr/include/*
+  ..
+  > 7zz a inc.7z date.txt
+  ..
+  > 7zz l inc.7z  | tail -n4
+  2022-10-15 00:33:00 ....A        96261               zlib.h
+  2024-07-25 19:47:24 ....A           33           37  date.txt
+  ------------------- ----- ------------ ------------  ------------------------
+  2024-07-25 19:47:24           22134045      3066153  2623 files, 129 folders
+  > 7zz l -ba inc.7z date.txt nss.h
+  2024-05-06 23:34:28 ....A        14408               nss.h
+  2024-07-25 19:47:24 ....A           33           37  date.txt
+#+end_example
+
+Above, we asked to list =date.txt= first, but it got listed last due to the
+/archive order/. The same applies to extracting multiple symlinks to stdout: the
+targets will be printed in the /archive order/. This is why sorting in =u7z=
+happens so late in the links resolver branch.
+
+As for the /extract to disk/ option, it is not practical. The new linux 7zip
+(not p7zip) considers some symlinks /dangerous/ and does refuse to extract
+those:
+
+#+begin_example
+  > ln -s /usr/bin link1
+  > 7zz a -snl 1.7z link1
+  ..
+  > rm link1
+  > 7zz e -ba 1.7z
+
+  Extracting archive: 1.7z
+  --
+  Path = 1.7z
+  Type = 7z
+  Physical Size = 126
+  Headers Size = 114
+  Method = LZMA2:12
+  Solid = -
+  Blocks = 1
+
+  ERROR: Dangerous link path was ignored : link1 : /usr/bin
+
+  Sub items Errors: 1
+
+  Archives with Errors: 1
+
+  Sub items Errors: 1
+#+end_example
