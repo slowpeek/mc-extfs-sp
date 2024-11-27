@@ -39,7 +39,7 @@ extension file/. Next:
 
     #+begin_example
       [squashfs]
-      Regex=\.(squashfs|sqfs)$
+      Regex=\\.(squashfs|sqfs)$
       Open=%cd %p/usqfs-sp://
     #+end_example
 
